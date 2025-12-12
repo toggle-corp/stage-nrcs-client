@@ -26,10 +26,10 @@ jobs:
       # pipeline / node
       PIPELINE_TYPE: cd
       NODE_OPTIONS: --max_old_space_size=4096
-
       NEXT_PUBLIC_GRAPHQL_CODEGEN_ENDPOINT: ${{ vars.NEXT_PUBLIC_GRAPHQL_CODEGEN_ENDPOINT }}
       NEXT_PUBLIC_GRAPHQL_DOMAIN: ${{ vars.NEXT_PUBLIC_GRAPHQL_DOMAIN }}
-      GITHUB_WORKFLOW: true
+      BASE_PREFIX: ${{ vars.BASE_PREFIX }}
+
 
     steps:
       - name: Checkout staging repo (to read config & deploy)
@@ -42,7 +42,7 @@ jobs:
           script: |
             const fs = require('fs');
 
-            const raw = fs.readFileSync('config.json','utf8');
+            const raw = fs.readFileSync('.github/config.json','utf8');
             const cfg = JSON.parse(raw);
 
             const repository = cfg.repositoryUrl;
@@ -64,7 +64,6 @@ jobs:
             core.setOutput('cacheDir', cacheDir);
 
             core.setOutput('install',  cfg.install  || '');
-            core.setOutput('generate', cfg.generate || '');
             core.setOutput('prebuild', cfg.prebuild    || '');
             core.setOutput('build',    cfg.build    || '');
 
@@ -78,6 +77,14 @@ jobs:
           token: ${{ secrets.STAGING_FETCH_TOKEN || secrets.GITHUB_TOKEN }}
           path: source
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.cfg.outputs.nodeVersion }}
+
+      - name: Install pnpm
+        run: npm install -g pnpm      
+            
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -96,11 +103,6 @@ jobs:
         if: ${{ steps.cfg.outputs.install != '' }}
         working-directory: source
         run: ${{ steps.cfg.outputs.install }}
-
-      - name: Generate
-        if: ${{ steps.cfg.outputs.generate != '' }}
-        working-directory: source
-        run: ${{ steps.cfg.outputs.generate }}
 
       - name: Fetch data
         if: ${{ steps.cfg.outputs.prebuild != '' }}

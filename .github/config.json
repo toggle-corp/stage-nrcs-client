@@ -7,7 +7,6 @@
     "nodeVersion": "22.x",
 
     "install": "pnpm install",
-    "generate": "pnpm generate:type",
     "prebuild": "pnpm prebuild",
     "build": "pnpm build",
 
