@@ -1,0 +1,136 @@
+name: CD (Staging from Main)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Override branch/commit/tag from main repo (optional)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "1 0 * * *" # optional
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on:
+      ubuntu-latest
+      # If you want Environment-scoped vars/secrets, set it here:
+    environment: staging
+
+    env:
+      # pipeline / node
+      PIPELINE_TYPE: cd
+      NODE_OPTIONS: --max_old_space_size=4096
+
+      NEXT_PUBLIC_GRAPHQL_CODEGEN_ENDPOINT: ${{ vars.NEXT_PUBLIC_GRAPHQL_CODEGEN_ENDPOINT }}
+      NEXT_PUBLIC_GRAPHQL_DOMAIN: ${{ vars.NEXT_PUBLIC_GRAPHQL_DOMAIN }}
+      GITHUB_WORKFLOW: true
+
+    steps:
+      - name: Checkout staging repo (to read config & deploy)
+        uses: actions/checkout@v4
+
+      - name: Parse config.json
+        id: cfg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const raw = fs.readFileSync('config.json','utf8');
+            const cfg = JSON.parse(raw);
+
+            const repository = cfg.repositoryUrl;
+            const branchInput = process.env['INPUT_BRANCH'] || '';
+            const ref = branchInput || cfg.branch || 'main';
+            const submodules = !!cfg.submodules;
+            const nodeVersion = cfg.nodeVersion || '18.x';
+            const buildOutput = cfg.buildOutput || '';
+            const cacheDir = cfg.cacheDir || 'cache';
+
+            if (!repository) core.setFailed('config.json: "repositoryUrl" is required');
+            if (!buildOutput) core.setFailed('config.json: "buildOutput" is required');
+
+            core.setOutput('repository', repository);
+            core.setOutput('ref', ref);
+            core.setOutput('submodules', String(submodules));
+            core.setOutput('nodeVersion', nodeVersion);
+            core.setOutput('buildOutput', buildOutput);
+            core.setOutput('cacheDir', cacheDir);
+
+            core.setOutput('install',  cfg.install  || '');
+            core.setOutput('generate', cfg.generate || '');
+            core.setOutput('prebuild', cfg.prebuild    || '');
+            core.setOutput('build',    cfg.build    || '');
+
+      - name: Checkout source (main repo)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.cfg.outputs.repository }}
+          ref: ${{ steps.cfg.outputs.ref }}
+          submodules: ${{ steps.cfg.outputs.submodules }}
+          # If cross-org/private, add a PAT secret in staging repo
+          token: ${{ secrets.STAGING_FETCH_TOKEN || secrets.GITHUB_TOKEN }}
+          path: source
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.cfg.outputs.nodeVersion }}
+          cache: 'pnpm'
+          cache-dependency-path: 'source/pnpm-lock.yaml'
+
+      - name: Restore data cache
+        uses: actions/cache@v4
+        id: data-cache
+        with:
+          path: source/${{ steps.cfg.outputs.cacheDir }}
+          key: data-cache
+
+      - name: Install deps
+        if: ${{ steps.cfg.outputs.install != '' }}
+        working-directory: source
+        run: ${{ steps.cfg.outputs.install }}
+
+      - name: Generate
+        if: ${{ steps.cfg.outputs.generate != '' }}
+        working-directory: source
+        run: ${{ steps.cfg.outputs.generate }}
+
+      - name: Fetch data
+        if: ${{ steps.cfg.outputs.prebuild != '' }}
+        working-directory: source
+        run: ${{ steps.cfg.outputs.prebuild }}
+
+      - name: Build (and/or test)
+        if: ${{ steps.cfg.outputs.build != '' }}
+        working-directory: source
+        run: ${{ steps.cfg.outputs.build }}
+        timeout-minutes: 30
+
+      - name: Upload GH artifact for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: source/${{ steps.cfg.outputs.buildOutput }}
+
+  deploy:
+    name: Deploy (GH Pages - Staging)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    # Use the same environment if you want its URL & approvals here too
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v4

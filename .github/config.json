@@ -1,0 +1,16 @@
+
+
+{
+    "repositoryUrl": "toggle-corp/nrcs-client",
+    "branch": "stage",
+    "submodules": true,
+    "nodeVersion": "22.x",
+
+    "install": "pnpm install",
+    "generate": "pnpm generate:type",
+    "prebuild": "pnpm prebuild",
+    "build": "pnpm build",
+
+    "buildOutput": "out",
+    "cacheDir": "fullData"
+}
