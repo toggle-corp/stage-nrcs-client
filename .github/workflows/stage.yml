@@ -7,6 +7,10 @@ on:
         description: "Override branch/commit/tag from main repo (optional)"
         required: false
         default: ""
+  push:
+    branches:
+      - develop
+      
   schedule:
     - cron: "1 0 * * *" # optional
 
@@ -29,7 +33,6 @@ jobs:
       NEXT_PUBLIC_GRAPHQL_CODEGEN_ENDPOINT: ${{ vars.NEXT_PUBLIC_GRAPHQL_CODEGEN_ENDPOINT }}
       NEXT_PUBLIC_GRAPHQL_DOMAIN: ${{ vars.NEXT_PUBLIC_GRAPHQL_DOMAIN }}
       BASE_PREFIX: ${{ vars.BASE_PREFIX }}
-
 
     steps:
       - name: Checkout staging repo (to read config & deploy)
@@ -83,14 +86,14 @@ jobs:
           node-version: ${{ steps.cfg.outputs.nodeVersion }}
 
       - name: Install pnpm
-        run: npm install -g pnpm      
-            
+        run: npm install -g pnpm
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ steps.cfg.outputs.nodeVersion }}
-          cache: 'pnpm'
-          cache-dependency-path: 'source/pnpm-lock.yaml'
+          cache: "pnpm"
+          cache-dependency-path: "source/pnpm-lock.yaml"
 
       - name: Restore data cache
         uses: actions/cache@v4
