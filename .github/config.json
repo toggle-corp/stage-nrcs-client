@@ -1,8 +1,8 @@
 
 
 {
-    "repositoryUrl": "toggle-corp/nrcs-client",
-    "branch": "stage",
+    "repositoryUrl": "NRCS-NRCS/nrcs-client",
+    "branch": "develop",
     "submodules": true,
     "nodeVersion": "22.x",
 
